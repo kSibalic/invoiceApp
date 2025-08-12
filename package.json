@@ -1,0 +1,66 @@
+{
+  "name": "invoiceapp",
+  "version": "1.0.0",
+  "description": "Cross-platform desktop invoice maker built with Electron and Vanilla JS.",
+  "license": "MIT",
+  "author": "Karlo Šibalić",
+  "type": "module",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder -mwl",
+    "pack": "electron-builder --dir",
+    "clean": "rm -rf dist build",
+    "postinstall": "electron-builder install-app-deps",
+    "build:css": "tailwindcss -i ./src/tw.input.css -o ./src/tw.css --minify",
+    "watch:css": "tailwindcss -i ./src/tw.input.css -o ./src/tw.css --watch"
+  },
+  "dependencies": {
+    "jspdf": "^2.5.2",
+    "jspdf-autotable": "^3.8.2"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.21",
+    "electron": "^37.2.6",
+    "electron-builder": "^24.13.3",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17"
+  },
+  "build": {
+    "appId": "com.example.invoiceapp",
+    "productName": "InvoiceApp",
+    "asar": true,
+    "directories": {
+      "buildResources": "assets",
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.business",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "tar.gz"
+      ],
+      "category": "Office"
+    }
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

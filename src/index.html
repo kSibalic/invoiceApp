@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>InvoiceApp</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --bg-primary: #ffffff;
+        --bg-secondary: #f8fafc;
+        --bg-tertiary: #f1f5f9;
+        --sidebar-bg: linear-gradient(180deg, #6366f1 0%, #8b5cf6 100%);
+        --text-primary: #0f172a;
+        --text-secondary: #64748b;
+        --text-muted: #94a3b8;
+        --text-inverse: #ffffff;
+        --border-light: #e2e8f0;
+        --border-medium: #cbd5e1;
+        --accent-primary: #3b82f6;
+        --accent-secondary: #06b6d4;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        --radius-sm: 6px;
+        --radius-md: 8px;
+        --radius-lg: 12px;
+        --radius-xl: 16px;
+      }
+
+      [data-theme='dark'] {
+        --bg-primary: #0f172a;
+        --bg-secondary: #1e293b;
+        --bg-tertiary: #334155;
+        --text-primary: #f8fafc;
+        --text-secondary: #cbd5e1;
+        --text-muted: #94a3b8;
+        --border-light: #334155;
+        --border-medium: #475569;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        line-height: 1.6;
+        overflow: hidden;
+      }
+
+      .app-container {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        height: 100vh;
+        position: relative;
+      }
+
+      /* Sidebar */
+      .sidebar {
+        background: var(--sidebar-bg);
+        backdrop-filter: blur(20px);
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .sidebar::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+        pointer-events: none;
+      }
+
+      .sidebar-header {
+        padding: 24px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        position: relative;
+        z-index: 1;
+      }
+
+      .brand {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--text-inverse);
+        letter-spacing: -0.5px;
+      }
+
+      .nav-section {
+        flex: 1;
+        padding: 16px;
+        position: relative;
+        z-index: 1;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-radius: var(--radius-lg);
+        color: rgba(255, 255, 255, 0.8);
+        font-weight: 500;
+        font-size: 14px;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+        border: none;
+        background: none;
+        width: 100%;
+        text-align: left;
+        margin-bottom: 4px;
+      }
+
+      .nav-item:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-inverse);
+        transform: translateX(2px);
+      }
+
+      .nav-item.active {
+        background: rgba(255, 255, 255, 0.2);
+        color: var(--text-inverse);
+        box-shadow: var(--shadow-md);
+        backdrop-filter: blur(10px);
+      }
+
+      .nav-item svg {
+        width: 20px;
+        height: 20px;
+        flex-shrink: 0;
+      }
+
+      .nav-divider {
+        height: 1px;
+        background: rgba(255, 255, 255, 0.1);
+        margin: 16px 0;
+      }
+
+      .sidebar-actions {
+        padding: 16px;
+        display: flex;
+        gap: 8px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        position: relative;
+        z-index: 1;
+      }
+
+      .action-btn {
+        flex: 1;
+        padding: 12px;
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: var(--text-inverse);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .action-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateY(-1px);
+      }
+
+      .action-btn svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      /* Main Content */
+      .main-content {
+        background: var(--bg-primary);
+        overflow-y: auto;
+        position: relative;
+      }
+
+      .content-wrapper {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 32px;
+        min-height: 100vh;
+      }
+
+      .page-header {
+        margin-bottom: 32px;
+      }
+
+      .page-title {
+        font-size: 32px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 8px;
+        letter-spacing: -1px;
+      }
+
+      .page-subtitle {
+        color: var(--text-secondary);
+        font-size: 16px;
+      }
+
+      /* Cards */
+      .card {
+        background: var(--bg-primary);
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-xl);
+        padding: 24px;
+        box-shadow: var(--shadow-sm);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+        pointer-events: none;
+      }
+
+      .card:hover {
+        box-shadow: var(--shadow-lg);
+        transform: translateY(-2px);
+        border-color: var(--border-medium);
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 24px;
+      }
+
+      .card-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .grid {
+        display: grid;
+        gap: 24px;
+      }
+
+      .grid-2 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .grid-3 {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      /* Form Elements */
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      .form-label {
+        display: block;
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: 8px;
+        font-size: 14px;
+      }
+
+      .form-control {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-md);
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        font-size: 14px;
+        transition: all 0.2s ease;
+        outline: none;
+      }
+
+      .form-control:focus {
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        background: var(--bg-primary);
+      }
+
+      .form-control::placeholder {
+        color: var(--text-muted);
+      }
+
+      .form-row {
+        display: grid;
+        grid-template-columns: 140px 1fr;
+        gap: 16px;
+        align-items: center;
+        margin-bottom: 16px;
+      }
+
+      .form-inline {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      /* Buttons */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        border-radius: var(--radius-md);
+        font-weight: 500;
+        font-size: 14px;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        justify-content: center;
+      }
+
+      .btn-primary {
+        background: var(--accent-primary);
+        color: white;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .btn-primary:hover {
+        background: #2563eb;
+        box-shadow: var(--shadow-md);
+        transform: translateY(-1px);
+      }
+
+      .btn-secondary {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+        border-color: var(--border-light);
+      }
+
+      .btn-secondary:hover {
+        background: var(--border-light);
+        border-color: var(--border-medium);
+      }
+
+      .btn-danger {
+        background: var(--danger);
+        color: white;
+      }
+
+      .btn-danger:hover {
+        background: #dc2626;
+      }
+
+      .btn-sm {
+        padding: 6px 12px;
+        font-size: 12px;
+      }
+
+      .btn-xs {
+        padding: 4px 8px;
+        font-size: 11px;
+      }
+
+      /* Table */
+      .table-container {
+        overflow-x: auto;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border-light);
+        background: var(--bg-primary);
+      }
+
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .table th {
+        background: var(--bg-tertiary);
+        padding: 16px;
+        text-align: left;
+        font-weight: 600;
+        color: var(--text-primary);
+        border-bottom: 1px solid var(--border-light);
+        font-size: 14px;
+      }
+
+      .table td {
+        padding: 16px;
+        border-bottom: 1px solid var(--border-light);
+        color: var(--text-primary);
+      }
+
+      .table tbody tr:hover {
+        background: var(--bg-secondary);
+      }
+
+      .table tbody tr:last-child td {
+        border-bottom: none;
+      }
+
+      .text-right {
+        text-align: right;
+      }
+
+      /* Items Table */
+      .items-table .table td {
+        padding: 12px;
+      }
+
+      .items-table .form-control {
+        padding: 8px 12px;
+        font-size: 13px;
+        background: transparent;
+        border: 1px solid transparent;
+      }
+
+      .items-table .form-control:focus {
+        background: var(--bg-primary);
+        border-color: var(--accent-primary);
+      }
+
+      /* Totals */
+      .totals-section {
+        background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        margin-top: 24px;
+      }
+
+      .totals-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+      }
+
+      .totals-row.grand {
+        border-top: 2px solid var(--border-medium);
+        margin-top: 12px;
+        padding-top: 12px;
+        font-weight: 700;
+        font-size: 18px;
+      }
+
+      /* Status Badge */
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .badge.open {
+        background: #fef3c7;
+        color: #d97706;
+      }
+
+      .badge.paid {
+        background: #d1fae5;
+        color: #065f46;
+      }
+
+      .badge.overdue {
+        background: #fee2e2;
+        color: #dc2626;
+      }
+
+      /* Modals */
+      .modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(8px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: 20px;
+      }
+
+      .modal.open {
+        display: flex;
+      }
+
+      .modal-content {
+        background: var(--bg-primary);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-xl);
+        width: 100%;
+        max-width: 800px;
+        max-height: 90vh;
+        overflow-y: auto;
+        position: relative;
+        border: 1px solid var(--border-light);
+      }
+
+      .modal-header {
+        padding: 24px 24px 0;
+        border-bottom: 1px solid var(--border-light);
+        margin-bottom: 24px;
+      }
+
+      .modal-title {
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 24px;
+      }
+
+      .modal-body {
+        padding: 0 24px;
+      }
+
+      .modal-footer {
+        padding: 24px;
+        border-top: 1px solid var(--border-light);
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 24px;
+      }
+
+      /* Views */
+      .view {
+        display: none;
+      }
+
+      .view.active {
+        display: block;
+      }
+
+      /* Responsive */
+      @media (max-width: 1024px) {
+        .grid-2 {
+          grid-template-columns: 1fr;
+        }
+        
+        .form-row {
+          grid-template-columns: 1fr;
+        }
+        
+        .app-container {
+          grid-template-columns: 260px 1fr;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .app-container {
+          grid-template-columns: 1fr;
+        }
+        
+        .sidebar {
+          position: fixed;
+          left: -280px;
+          top: 0;
+          bottom: 0;
+          width: 280px;
+          z-index: 1000;
+          transition: left 0.3s ease;
+        }
+        
+        .sidebar.open {
+          left: 0;
+        }
+        
+        .content-wrapper {
+          padding: 20px;
+        }
+      }
+
+      /* Print Styles */
+      @media print {
+        .sidebar,
+        .modal,
+        .btn,
+        .action-btn,
+        [data-no-print] {
+          display: none !important;
+        }
+        
+        .app-container {
+          grid-template-columns: 1fr;
+        }
+        
+        .main-content {
+          overflow: visible;
+        }
+        
+        body {
+          background: white;
+          color: black;
+        }
+      }
+
+      /* Animations */
+      @keyframes slideInUp {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .card {
+        animation: slideInUp 0.3s ease-out;
+      }
+
+      .nav-item {
+        position: relative;
+        overflow: hidden;
+      }
+
+      .nav-item::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+        transition: left 0.5s;
+      }
+
+      .nav-item:hover::before {
+        left: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- SVG Icons -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+      <symbol id="i-edit" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75ZM20.71 7.04a1 1 0 0 0 0-1.41L18.37 3.29a1 1 0 0 0-1.41 0L15 5.25l3.75 3.75Z"/>
+      </symbol>
+      <symbol id="i-list" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M3 5h18v2H3zm0 6h18v2H3zm0 6h18v2H3z"/>
+      </symbol>
+      <symbol id="i-user" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M12 12a5 5 0 1 0-5-5a5 5 0 0 0 5 5m0 2c-4 0-8 2-8 5v3h16v-3c0-3-4-5-8-5Z"/>
+      </symbol>
+      <symbol id="i-brief" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M10 4h4a2 2 0 0 1 2 2v1h4v13H4V7h4V6a2 2 0 0 1 2-2m0 3h4V6h-4z"/>
+      </symbol>
+      <symbol id="i-gear" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M12 8a4 4 0 1 1 0 8a4 4 0 0 1 0-8m9.4 4a7.4 7.4 0 0 0-.1-1l2-1.5l-2-3.5l-2.4 1a7.7 7.7 0 0 0-1.7-1L16.5 2h-4.9l-.6 3.5a7.7 7.7 0 0 0-1.7 1l-2.4-1L4 8l2 1.5a7.4 7.4 0 0 0-.1 1a7.4 7.4 0 0 0 .1 1L4 13l2 3.5l2.4-1a7.7 7.7 0 0 0 1.7 1l.6 3.5h4.9l.6-3.5a7.7 7.7 0 0 0 1.7-1l2.4 1L23 13l-2-1.5a7.4 7.4 0 0 0 .1-1"/>
+      </symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6z"/>
+      </symbol>
+      <symbol id="i-save" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7Zm-5 16a3 3 0 1 1 0-6a3 3 0 0 1 0 6m3-10H5V5h10z"/>
+      </symbol>
+      <symbol id="i-pdf" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm-1 7V3.5L18.5 9z"/>
+      </symbol>
+    </svg>
+
+    <div class="app-container">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="brand">InvoiceApp</div>
+        </div>
+        
+        <nav class="nav-section">
+          <button id="nav-editor" class="nav-item active">
+            <svg><use href="#i-edit"/></svg>
+            <span>Uređivač</span>
+          </button>
+          <button id="nav-invoices" class="nav-item">
+            <svg><use href="#i-list"/></svg>
+            <span>Računi</span>
+          </button>
+          
+          <div class="nav-divider"></div>
+          
+          <button id="nav-clients" class="nav-item">
+            <svg><use href="#i-user"/></svg>
+            <span>Klijenti</span>
+          </button>
+          <button id="nav-profiles" class="nav-item">
+            <svg><use href="#i-brief"/></svg>
+            <span>Profili</span>
+          </button>
+          
+          <div class="nav-divider"></div>
+          
+          <button id="nav-settings" class="nav-item">
+            <svg><use href="#i-gear"/></svg>
+            <span>Postavke</span>
+          </button>
+        </nav>
+        
+        <div class="sidebar-actions">
+          <button id="act-new" class="action-btn" title="Novi račun">
+            <svg><use href="#i-plus"/></svg>
+          </button>
+          <button id="act-save" class="action-btn" title="Spremi">
+            <svg><use href="#i-save"/></svg>
+          </button>
+          <button id="act-pdf" class="action-btn" title="Izvoz PDF">
+            <svg><use href="#i-pdf"/></svg>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="content-wrapper">
+          <!-- Editor View -->
+          <section id="view-editor" class="view active">
+            <div class="page-header">
+              <h1 class="page-title">Novi račun</h1>
+              <p class="page-subtitle">Kreirajte profesionalni račun za vaše klijente</p>
+            </div>
+
+            <!-- Invoice Details -->
+            <div class="grid grid-2">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Podaci računa</h3>
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Broj računa</label>
+                  <input type="text" id="invoice-number" class="form-control" placeholder="npr. 2024-001">
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Datum</label>
+                  <input type="date" id="invoice-date" class="form-control">
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Poslovni profil</label>
+                  <div class="form-inline">
+                    <select id="from-profile" class="form-control" style="flex: 1;">
+                      <option value="">Odaberite profil...</option>
+                    </select>
+                    <button id="manage-profiles" class="btn btn-secondary btn-sm">Upravljaj</button>
+                  </div>
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Stopa poreza (%)</label>
+                  <input type="number" id="tax-rate" class="form-control" min="0" step="0.01" placeholder="25.00">
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Status i napomene</h3>
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Status računa</label>
+                  <select id="invoice-status" class="form-control">
+                    <option value="open">Neplaćen</option>
+                    <option value="paid">Plaćen</option>
+                    <option value="overdue">Dospio</option>
+                  </select>
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Napomene / Uvjeti</label>
+                  <textarea id="notes" class="form-control" rows="4" placeholder="Dodatne napomene, uvjeti plaćanja..."></textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- From/To Information -->
+            <div class="grid grid-2">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Od (Pošaljitelj)</h3>
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Naziv tvrtke</label>
+                  <input type="text" id="from-name" class="form-control" placeholder="Vaša tvrtka d.o.o.">
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Adresa</label>
+                  <textarea id="from-address" class="form-control" rows="3" placeholder="Ulica i broj&#10;Poštanski broj, grad&#10;Država"></textarea>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="card-title">Za (Primatelj)</h3>
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Klijent</label>
+                  <div class="form-inline">
+                    <select id="client-select" class="form-control" style="flex: 1;">
+                      <option value="">Odaberite klijenta...</option>
+                    </select>
+                    <button id="manage-clients" class="btn btn-secondary btn-sm">Upravljaj</button>
+                  </div>
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Naziv</label>
+                  <input type="text" id="billto-name" class="form-control" placeholder="Naziv klijenta">
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Adresa</label>
+                  <textarea id="billto-address" class="form-control" rows="2" placeholder="Adresa klijenta"></textarea>
+                </div>
+                
+                <div class="grid grid-2">
+                  <div class="form-group">
+                    <label class="form-label">Telefon</label>
+                    <input type="tel" id="billto-phone" class="form-control" placeholder="+385 99 123 456">
+                  </div>
+                  
+                  <div class="form-group">
+                    <label class="form-label">E-mail</label>
+                    <input type="email" id="billto-email" class="form-control" placeholder="klijent@example.com">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Items Table -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">Stavke računa</h3>
+                <button id="add-item" class="btn btn-primary">
+                  <svg width="16" height="16"><use href="#i-plus"/></svg>
+                  Dodaj stavku
+                </button>
+              </div>
+              
+              <div class="table-container items-table">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th style="width: 40%">Opis</th>
+                      <th style="width: 15%" class="text-right">Količina</th>
+                      <th style="width: 20%" class="text-right">Jedinična cijena</th>
+                      <th style="width: 20%" class="text-right">Ukupno</th>
+                      <th style="width: 5%"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="items-body">
+                    <!-- Items will be populated by JavaScript -->
+                  </tbody>
+                </table>
+              </div>
+              
+              <div class="totals-section">
+                <div class="totals-row">
+                  <span>Međuzbroj:</span>
+                  <strong id="subtotal-bottom">€0.00</strong>
+                </div>
+                <div class="totals-row">
+                  <span>Porez:</span>
+                  <strong id="tax-bottom">€0.00</strong>
+                </div>
+                <div class="totals-row grand">
+                  <span>Ukupno:</span>
+                  <strong id="total-bottom">€0.00</strong>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Invoice List View -->
+          <section id="view-list" class="view">
+            <div class="page-header">
+              <h1 class="page-title">Svi računi</h1>
+              <p class="page-subtitle">Upravljajte svojim računima i pratite plaćanja</p>
+            </div>
+            
+            <div class="card">
+              <div class="card-header">
+                <div style="flex: 1;">
+                  <input id="search" class="form-control" placeholder="Pretražite račune..." style="max-width: 320px;">
+                </div>
+                <div class="form-inline">
+                  <button class="btn btn-secondary btn-sm" data-status="all">Svi</button>
+                  <button class="btn btn-secondary btn-sm" data-status="open">Neplaćeni</button>
+                  <button class="btn btn-secondary btn-sm" data-status="paid">Plaćeni</button>
+                  <button class="btn btn-secondary btn-sm" data-status="overdue">Dospjeli</button>
+                </div>
+              </div>
+              
+              <div class="table-container">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Broj računa</th>
+                      <th>Datum</th>
+                      <th>Status</th>
+                      <th>Klijent</th>
+                      <th class="text-right">Ukupno</th>
+                      <th>Radnje</th>
+                    </tr>
+                  </thead>
+                  <tbody id="invoices-list-body">
+                    <!-- Invoice list will be populated by JavaScript -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">Postavke aplikacije</h3>
+        </div>
+        
+        <div class="modal-body">
+          <div class="grid grid-2">
+            <div class="card">
+              <div class="card-header">
+                <h4 class="card-title">Općenito</h4>
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">Zadana stopa poreza (%)</label>
+                <input type="number" id="settings-tax" class="form-control" min="0" step="0.01" placeholder="25.00">
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">Tema</label>
+                <select id="settings-theme" class="form-control">
+                  <option value="light">Svijetla</option>
+                  <option value="dark">Tamna</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h4 class="card-title">Poslovni podaci</h4>
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">Naziv tvrtke</label>
+                <input type="text" id="settings-business-name" class="form-control" placeholder="Vaša tvrtka d.o.o.">
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">Adresa</label>
+                <textarea id="settings-business-address" class="form-control" rows="3" placeholder="Puna adresa tvrtke"></textarea>
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">Telefon</label>
+                <input type="tel" id="settings-business-phone" class="form-control" placeholder="+385 1 234 5678">
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">E-mail</label>
+                <input type="email" id="settings-business-email" class="form-control" placeholder="info@vaša-tvrtka.hr">
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button id="settings-cancel" class="btn btn-secondary">Odustani</button>
+          <button id="settings-save" class="btn btn-primary">Spremi postavke</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Clients Modal -->
+    <div id="clients-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">Upravljanje klijentima</h3>
+        </div>
+        
+        <div class="modal-body">
+          <div class="card-header">
+            <input id="client-search" class="form-control" placeholder="Pretražite klijente..." style="max-width: 320px;">
+            <button id="client-new" class="btn btn-primary">
+              <svg width="16" height="16"><use href="#i-plus"/></svg>
+              Novi klijent
+            </button>
+          </div>
+          
+          <!-- Client Form -->
+          <div class="card" id="client-form" style="display:none; margin: 20px 0;">
+            <div class="card-header">
+              <h4 class="card-title">Dodaj/Uredi klijenta</h4>
+            </div>
+            
+            <div class="grid grid-2">
+              <div class="form-group">
+                <label class="form-label">Naziv</label>
+                <input type="text" id="client-name" class="form-control" placeholder="Naziv klijenta">
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">Telefon</label>
+                <input type="tel" id="client-phone" class="form-control" placeholder="+385 99 123 456">
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">E-mail</label>
+                <input type="email" id="client-email" class="form-control" placeholder="klijent@example.com">
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">Adresa</label>
+                <textarea id="client-address" class="form-control" rows="2" placeholder="Adresa klijenta"></textarea>
+              </div>
+            </div>
+            
+            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px;">
+              <button id="client-cancel" class="btn btn-secondary">Odustani</button>
+              <button id="client-save" class="btn btn-primary">Spremi klijenta</button>
+            </div>
+          </div>
+          
+          <!-- Clients Table -->
+          <div class="table-container">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Naziv</th>
+                  <th>Telefon</th>
+                  <th>E-mail</th>
+                  <th>Adresa</th>
+                  <th>Radnje</th>
+                </tr>
+              </thead>
+              <tbody id="clients-body">
+                <!-- Clients will be populated by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button id="clients-close" class="btn btn-secondary">Zatvori</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profiles Modal -->
+    <div id="profiles-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">Poslovni profili</h3>
+        </div>
+        
+        <div class="modal-body">
+          <div class="card-header">
+            <input id="profile-search" class="form-control" placeholder="Pretražite profile..." style="max-width: 320px;">
+            <button id="profile-new" class="btn btn-primary">
+              <svg width="16" height="16"><use href="#i-plus"/></svg>
+              Novi profil
+            </button>
+          </div>
+          
+          <!-- Profile Form -->
+          <div class="card" id="profile-form" style="display:none; margin: 20px 0;">
+            <div class="card-header">
+              <h4 class="card-title">Dodaj/Uredi profil</h4>
+            </div>
+            
+            <div class="grid grid-2">
+              <div class="form-group">
+                <label class="form-label">Naziv</label>
+                <input type="text" id="profile-name" class="form-control" placeholder="Naziv profila">
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">Telefon</label>
+                <input type="tel" id="profile-phone" class="form-control" placeholder="+385 1 234 5678">
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">E-mail</label>
+                <input type="email" id="profile-email" class="form-control" placeholder="info@tvrtka.hr">
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">Adresa</label>
+                <textarea id="profile-address" class="form-control" rows="2" placeholder="Adresa profila"></textarea>
+              </div>
+            </div>
+            
+            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px;">
+              <button id="profile-cancel" class="btn btn-secondary">Odustani</button>
+              <button id="profile-save" class="btn btn-primary">Spremi profil</button>
+            </div>
+          </div>
+          
+          <!-- Profiles Table -->
+          <div class="table-container">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Naziv</th>
+                  <th>Telefon</th>
+                  <th>E-mail</th>
+                  <th>Adresa</th>
+                  <th>Radnje</th>
+                </tr>
+              </thead>
+              <tbody id="profiles-body">
+                <!-- Profiles will be populated by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button id="profiles-close" class="btn btn-secondary">Zatvori</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Print Area (hidden) -->
+    <div id="print-area" style="display:none"></div>
+
+    <!-- JavaScript -->
+    <script>
+      // Prevent drag-and-drop navigation
+      document.addEventListener('dragover', (e) => e.preventDefault());
+      document.addEventListener('drop', (e) => e.preventDefault());
+      
+      // Print styles
+      const printStyles = document.createElement('style');
+      printStyles.textContent = `
+        @media print {
+          #print-area { 
+            display: block !important; 
+            padding: 40px;
+            font-family: Inter, sans-serif;
+          }
+          
+          #print-area .pi-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: flex-start; 
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e2e8f0;
+          }
+          
+          #print-area .pi-header h1 { 
+            margin: 0; 
+            font-size: 32px;
+            color: #1e293b;
+            font-weight: 700;
+          }
+          
+          #print-area .pi-meta div {
+            margin-bottom: 4px;
+            font-size: 14px;
+          }
+          
+          #print-area .pi-info { 
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px; 
+            margin-bottom: 40px; 
+          }
+          
+          #print-area .pi-info h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #334155;
+          }
+          
+          #print-area .pi-info div {
+            line-height: 1.5;
+            color: #475569;
+          }
+          
+          #print-area .pi-items { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-bottom: 30px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            overflow: hidden;
+          }
+          
+          #print-area .pi-items th, 
+          #print-area .pi-items td { 
+            border: 1px solid #e2e8f0; 
+            padding: 12px 16px;
+            text-align: left;
+          }
+          
+          #print-area .pi-items thead th { 
+            background: #f8fafc;
+            font-weight: 600;
+            color: #334155;
+            font-size: 14px;
+          }
+          
+          #print-area .pi-items .text-right { 
+            text-align: right; 
+          }
+          
+          #print-area .pi-totals {
+            margin-left: auto;
+            width: 300px;
+          }
+          
+          #print-area .pi-totals td { 
+            border: none;
+            padding: 8px 0;
+          }
+          
+          #print-area .pi-totals .grand td { 
+            border-top: 2px solid #334155;
+            padding-top: 12px;
+            font-weight: 700;
+            font-size: 18px;
+          }
+          
+          #print-area .pi-notes { 
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+          }
+          
+          #print-area .pi-notes strong {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #334155;
+          }
+        }
+      `;
+      document.head.appendChild(printStyles);
+
+      // Mock window.api for demo
+      if (!window.api) {
+        window.api = {
+          settings: {
+            get: () => Promise.resolve({
+              taxRate: 25,
+              currency: '€',
+              business: { name: '', address: '', phone: '', email: '' },
+              theme: 'light',
+              lastInvoiceNumber: 0
+            }),
+            save: (settings) => Promise.resolve(settings)
+          },
+          invoice: {
+            list: (query) => Promise.resolve([]),
+            load: (id) => Promise.resolve({}),
+            save: (invoice) => Promise.resolve(invoice),
+            delete: (id) => Promise.resolve(),
+            duplicate: (id, nextNumber) => Promise.resolve({}),
+            nextNumber: () => Promise.resolve('0001')
+          },
+          pdf: {
+            export: (invoice) => Promise.resolve({ canceled: false })
+          },
+          clients: {
+            list: (query) => Promise.resolve([]),
+            save: (client) => Promise.resolve(client),
+            delete: (id) => Promise.resolve()
+          },
+          profiles: {
+            list: (query) => Promise.resolve([]),
+            save: (profile) => Promise.resolve(profile),
+            delete: (id) => Promise.resolve()
+          },
+          menu: {
+            onNew: (cb) => {},
+            onOpen: (cb) => {},
+            onSave: (cb) => {},
+            onExport: (cb) => {},
+            onPrint: (cb) => {},
+            onSettings: (cb) => {},
+            onToggleTheme: (cb) => {}
+          }
+        };
+      }
+    </script>
+    <script src="renderer.js" type="module"></script>
+  </body>
+</html>
