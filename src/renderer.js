@@ -1,9 +1,15 @@
 // ---------- Utilities ----------
-const $ = (sel, parent = document) => parent.querySelector(sel);
+const $ = (sel, parent = document) => parent.querySelector(sel);        
 const $$ = (sel, parent = document) => Array.from(parent.querySelectorAll(sel));
-const onClick = (id, handler) => {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener('click', handler);
+
+// Helper function for click events
+const onClick = (elementId, handler) => {
+  const element = document.getElementById(elementId);
+  if (element) {
+    element.addEventListener('click', handler);
+  } else {
+    console.warn(`Element with ID '${elementId}' not found`);
+  }
 };
 
 // Access the API exposed by preload (contextIsolation: true)
@@ -41,40 +47,6 @@ const blankInvoice = () => ({
 });
 
 // ---------- Rendering ----------
-const renderInvoiceForm = () => {
-  const inv = currentInvoice;
-  $('#invoice-number').value = inv.invoiceNumber || '';
-  $('#invoice-date').value = inv.date || '';
-  const statusSel = $('#invoice-status');
-  if (statusSel) statusSel.value = inv.status || 'open';
-  
-  $('#from-name').value = inv.from?.name || '';
-  $('#from-address').value = inv.from?.address || '';
-  
-  $('#billto-name').value = inv.billTo?.name || '';
-  $('#billto-address').value = inv.billTo?.address || '';
-  $('#billto-phone').value = inv.billTo?.phone || '';
-  $('#billto-email').value = inv.billTo?.email || '';
-  
-  $('#notes').value = inv.notes || '';
-  $('#tax-rate').val((inv.taxRate ?? appSettings?.taxRate) || 0);
-
-  const tbody = $('#items-body');
-  tbody.innerHTML = '';
-  inv.items.forEach((it, idx) => tbody.appendChild(renderItemRow(it, idx)));
-  updateTotals();
-
-  // Fill dropdowns
-  renderClientDropdown();
-  renderProfileDropdown();
-  
-  // Update page title based on invoice
-  const pageTitle = $('.page-title');
-  if (pageTitle) {
-    pageTitle.textContent = inv.invoiceNumber ? `Račun ${inv.invoiceNumber}` : 'Novi račun';
-  }
-};
-
 const renderItemRow = (item, index) => {
   const tr = document.createElement('tr');
   tr.innerHTML = `
@@ -154,15 +126,19 @@ const renderItemRow = (item, index) => {
 
 const updateTotals = () => {
   const inv = currentInvoice;
+  if (!inv) return;
+
   let sub = 0;
   
-  $$('#items-body tr').forEach((row, idx) => {
+  const itemRows = document.querySelectorAll('#items-body tr');
+  itemRows.forEach((row, idx) => {
     const it = inv.items[idx];
     if (it) {
       const qty = Number(it.quantity) || 0;
       const price = Number(it.unitPrice) || 0;
       const lineTotal = qty * price;
-      row.querySelector('.line-total').textContent = formatCurrency(lineTotal);
+      const lineTotalEl = row.querySelector('.line-total');
+      if (lineTotalEl) lineTotalEl.textContent = formatCurrency(lineTotal);
       sub += lineTotal;
     }
   });
@@ -171,7 +147,6 @@ const updateTotals = () => {
   const tax = (sub * taxRate) / 100;
   const total = sub + tax;
   
-  // Update totals in the summary
   const subtotalEl = $('#subtotal-bottom');
   const taxEl = $('#tax-bottom');
   const totalEl = $('#total-bottom');
@@ -180,23 +155,26 @@ const updateTotals = () => {
   if (taxEl) taxEl.textContent = formatCurrency(tax);
   if (totalEl) totalEl.textContent = formatCurrency(total);
   
-  // Update the tax label to show current rate
-  const taxRow = taxEl?.parentElement;
-  if (taxRow) {
-    const taxLabel = taxRow.querySelector('span');
-    if (taxLabel) taxLabel.textContent = `Porez (${taxRate}%):`;
+  if (taxEl) {
+    const taxRow = taxEl.parentElement;
+    if (taxRow) {
+      const taxLabel = taxRow.querySelector('span');
+      if (taxLabel) taxLabel.textContent = `Porez (${taxRate}%):`;
+    }
   }
 };
 
 let currentListFilter = 'all';
 const renderInvoiceList = async (query = '') => {
   try {
-    let list = await api.invoice.list(query);
+    let list = await api.invoice.list({ query });
     if (currentListFilter !== 'all') {
       list = list.filter((i) => (i.status || 'open') === currentListFilter);
     }
     
     const tbody = $('#invoices-list-body');
+    if (!tbody) return;
+    
     tbody.innerHTML = '';
     
     if (list.length === 0) {
@@ -243,59 +221,76 @@ const renderInvoiceList = async (query = '') => {
       `;
       
       // Toggle status
-      tr.querySelector('[data-toggle-status]').addEventListener('change', async (e) => {
-        try {
-          const invoice = await api.invoice.load(it.id);
-          invoice.status = e.target.checked ? 'paid' : 'open';
-          await api.invoice.save(invoice);
-          await renderInvoiceList($('#search').value);
-          showNotification('Status računa je ažuriran', 'success');
-        } catch (error) {
-          console.error('Error updating invoice status:', error);
-          showNotification('Greška pri ažuriranju statusa', 'error');
-        }
-      });
+      const toggleEl = tr.querySelector('[data-toggle-status]');
+      if (toggleEl) {
+        toggleEl.addEventListener('change', async (e) => {
+          try {
+            const invoice = await api.invoice.load(it.id);
+            invoice.status = e.target.checked ? 'paid' : 'open';
+            await api.invoice.save(invoice);
+            const searchEl = $('#search');
+            await renderInvoiceList(searchEl ? searchEl.value : '');
+            showNotification('Status računa je ažuriran', 'success');
+          } catch (error) {
+            console.error('Error updating invoice status:', error);
+            showNotification('Greška pri ažuriranju statusa', 'error');
+          }
+        });
+      }
       
-      tr.querySelector('[data-open]').addEventListener('click', async () => {
-        try {
-          const invoice = await api.invoice.load(it.id);
-          currentInvoice = invoice;
-          showView('editor');
-          renderInvoiceForm();
-          showNotification(`Otvoren račun ${invoice.invoiceNumber}`, 'success');
-        } catch (error) {
-          console.error('Error loading invoice:', error);
-          showNotification('Greška pri učitavanju računa', 'error');
-        }
-      });
+      const openBtn = tr.querySelector('[data-open]');
+      if (openBtn) {
+        openBtn.addEventListener('click', async () => {
+          try {
+            const invoice = await api.invoice.load(it.id);
+            currentInvoice = invoice;
+            showView('editor');
+            renderInvoiceForm();
+            setActiveNav('nav-editor');
+            showNotification(`Otvoren račun ${invoice.invoiceNumber}`, 'success');
+          } catch (error) {
+            console.error('Error loading invoice:', error);
+            showNotification('Greška pri učitavanju računa', 'error');
+          }
+        });
+      }
       
-      tr.querySelector('[data-duplicate]').addEventListener('click', async () => {
-        try {
-          const next = await api.invoice.nextNumber();
-          const dup = await api.invoice.duplicate(it.id, next);
-          await renderInvoiceList($('#search').value);
-          const invoice = await api.invoice.load(dup.id);
-          currentInvoice = invoice;
-          showView('editor');
-          renderInvoiceForm();
-          showNotification(`Kreiran dupliciran račun ${next}`, 'success');
-        } catch (error) {
-          console.error('Error duplicating invoice:', error);
-          showNotification('Greška pri dupliciranju računa', 'error');
-        }
-      });
+      const duplicateBtn = tr.querySelector('[data-duplicate]');
+      if (duplicateBtn) {
+        duplicateBtn.addEventListener('click', async () => {
+          try {
+            const next = await api.invoice.nextNumber();
+            const dup = await api.invoice.duplicate(it.id, next);
+            const searchEl = $('#search');
+            await renderInvoiceList(searchEl ? searchEl.value : '');
+            const invoice = await api.invoice.load(dup.id);
+            currentInvoice = invoice;
+            showView('editor');
+            renderInvoiceForm();
+            setActiveNav('nav-editor');
+            showNotification(`Kreiran dupliciran račun ${next}`, 'success');
+          } catch (error) {
+            console.error('Error duplicating invoice:', error);
+            showNotification('Greška pri dupliciranju računa', 'error');
+          }
+        });
+      }
       
-      tr.querySelector('[data-delete]').addEventListener('click', async () => {
-        if (!confirm(`Jeste li sigurni da želite obrisati račun ${it.invoiceNumber || it.id}?`)) return;
-        try {
-          await api.invoice.delete(it.id);
-          await renderInvoiceList($('#search').value);
-          showNotification('Račun je obrisan', 'success');
-        } catch (error) {
-          console.error('Error deleting invoice:', error);
-          showNotification('Greška pri brisanju računa', 'error');
-        }
-      });
+      const deleteBtn = tr.querySelector('[data-delete]');
+      if (deleteBtn) {
+        deleteBtn.addEventListener('click', async () => {
+          if (!confirm(`Jeste li sigurni da želite obrisati račun ${it.invoiceNumber || it.id}?`)) return;
+          try {
+            await api.invoice.delete(it.id);
+            const searchEl = $('#search');
+            await renderInvoiceList(searchEl ? searchEl.value : '');
+            showNotification('Račun je obrisan', 'success');
+          } catch (error) {
+            console.error('Error deleting invoice:', error);
+            showNotification('Greška pri brisanju računa', 'error');
+          }
+        });
+      }
       
       tbody.appendChild(tr);
     });
@@ -305,7 +300,6 @@ const renderInvoiceList = async (query = '') => {
   }
 };
 
-// ---------- Utility Functions ----------
 const formatDate = (dateString) => {
   if (!dateString) return '';
   try {
@@ -316,7 +310,6 @@ const formatDate = (dateString) => {
 };
 
 const showNotification = (message, type = 'info') => {
-  // Create notification element
   const notification = document.createElement('div');
   notification.style.cssText = `
     position: fixed;
@@ -345,12 +338,10 @@ const showNotification = (message, type = 'info') => {
   
   document.body.appendChild(notification);
   
-  // Animate in
   setTimeout(() => {
     notification.style.transform = 'translateX(0)';
   }, 10);
   
-  // Remove after 3 seconds
   setTimeout(() => {
     notification.style.transform = 'translateX(100%)';
     setTimeout(() => {
@@ -361,87 +352,150 @@ const showNotification = (message, type = 'info') => {
   }, 3000);
 };
 
+// ---------- Navigation ----------
+const setActiveNav = (activeId) => {
+  const navItems = document.querySelectorAll('.nav-item');
+  navItems.forEach((item) => item.classList.remove('active'));
+  const activeItem = document.getElementById(activeId);
+  if (activeItem) {
+    activeItem.classList.add('active');
+  } else {
+    console.error('Could not find nav item:', activeId);
+  }
+};
+
 // ---------- Events ----------
 const bindEvents = () => {
-  $('#add-item').addEventListener('click', () => {
-    currentInvoice.items.push({ description: '', quantity: 1, unitPrice: 0 });
-    renderInvoiceForm();
-  });
+  const addItemBtn = $('#add-item');
+  if (addItemBtn) {
+    addItemBtn.addEventListener('click', () => {
+      currentInvoice.items.push({ description: '', quantity: 1, unitPrice: 0 });
+      renderInvoiceForm();
+    });
+  }
   
-  $('#invoice-number').addEventListener('input', (e) => (currentInvoice.invoiceNumber = e.target.value));
-  $('#invoice-date').addEventListener('input', (e) => (currentInvoice.date = e.target.value));
+  const invoiceNumberEl = $('#invoice-number');
+  if (invoiceNumberEl) {
+    invoiceNumberEl.addEventListener('input', (e) => (currentInvoice.invoiceNumber = e.target.value));
+  }
+  
+  const invoiceDateEl = $('#invoice-date');
+  if (invoiceDateEl) {
+    invoiceDateEl.addEventListener('input', (e) => (currentInvoice.date = e.target.value));
+  }
   
   const statusSel = $('#invoice-status');
-  if (statusSel) statusSel.addEventListener('change', (e) => (currentInvoice.status = e.target.value));
+  if (statusSel) {
+    statusSel.addEventListener('change', (e) => (currentInvoice.status = e.target.value));
+  }
   
-  $('#from-name').addEventListener('input', (e) => (currentInvoice.from.name = e.target.value));
-  $('#from-address').addEventListener('input', (e) => (currentInvoice.from.address = e.target.value));
-  $('#billto-name').addEventListener('input', (e) => (currentInvoice.billTo.name = e.target.value));
-  $('#billto-address').addEventListener('input', (e) => (currentInvoice.billTo.address = e.target.value));
-  $('#billto-phone').addEventListener('input', (e) => (currentInvoice.billTo.phone = e.target.value));
-  $('#billto-email').addEventListener('input', (e) => (currentInvoice.billTo.email = e.target.value));
-  $('#notes').addEventListener('input', (e) => (currentInvoice.notes = e.target.value));
+  const fromNameEl = $('#from-name');
+  if (fromNameEl) {
+    fromNameEl.addEventListener('input', (e) => (currentInvoice.from.name = e.target.value));
+  }
   
-  $('#tax-rate').addEventListener('input', (e) => {
-    currentInvoice.taxRate = Number(e.target.value) || 0;
-    updateTotals();
-  });
+  const fromAddressEl = $('#from-address');
+  if (fromAddressEl) {
+    fromAddressEl.addEventListener('input', (e) => (currentInvoice.from.address = e.target.value));
+  }
+  
+  const billtoNameEl = $('#billto-name');
+  if (billtoNameEl) {
+    billtoNameEl.addEventListener('input', (e) => (currentInvoice.billTo.name = e.target.value));
+  }
+  
+  const billtoAddressEl = $('#billto-address');
+  if (billtoAddressEl) {
+    billtoAddressEl.addEventListener('input', (e) => (currentInvoice.billTo.address = e.target.value));
+  }
+  
+  const billtoPhoneEl = $('#billto-phone');
+  if (billtoPhoneEl) {
+    billtoPhoneEl.addEventListener('input', (e) => (currentInvoice.billTo.phone = e.target.value));
+  }
+  
+  const billtoEmailEl = $('#billto-email');
+  if (billtoEmailEl) {
+    billtoEmailEl.addEventListener('input', (e) => (currentInvoice.billTo.email = e.target.value));
+  }
+  
+  const notesEl = $('#notes');
+  if (notesEl) {
+    notesEl.addEventListener('input', (e) => (currentInvoice.notes = e.target.value));
+  }
+  
+  const taxRateEl = $('#tax-rate');
+  if (taxRateEl) {
+    taxRateEl.addEventListener('input', (e) => {
+      currentInvoice.taxRate = Number(e.target.value) || 0;
+      updateTotals();
+    });
+  }
   
   // Client and profile management
   onClick('manage-clients', () => openClients());
   onClick('manage-profiles', () => openProfiles());
   
-  $('#client-select').addEventListener('change', (e) => {
-    const id = e.target.value;
-    const c = clientsCache.find((x) => x.id === id);
-    if (!c) return;
-    
-    currentInvoice.billTo = {
-      name: c.name || '',
-      address: c.address || '',
-      phone: c.phone || '',
-      email: c.email || ''
-    };
-    
-    $('#billto-name').value = currentInvoice.billTo.name;
-    $('#billto-address').value = currentInvoice.billTo.address;
-    $('#billto-phone').value = currentInvoice.billTo.phone;
-    $('#billto-email').value = currentInvoice.billTo.email;
-  });
+  const clientSelectEl = $('#client-select');
+  if (clientSelectEl) {
+    clientSelectEl.addEventListener('change', (e) => {
+      const id = e.target.value;
+      const c = clientsCache.find((x) => x.id === id);
+      if (!c) return;
+      
+      currentInvoice.billTo = {
+        name: c.name || '',
+        address: c.address || '',
+        phone: c.phone || '',
+        email: c.email || ''
+      };
+      
+      const billtoNameEl = $('#billto-name');
+      const billtoAddressEl = $('#billto-address');
+      const billtoPhoneEl = $('#billto-phone');
+      const billtoEmailEl = $('#billto-email');
+      
+      if (billtoNameEl) billtoNameEl.value = currentInvoice.billTo.name;
+      if (billtoAddressEl) billtoAddressEl.value = currentInvoice.billTo.address;
+      if (billtoPhoneEl) billtoPhoneEl.value = currentInvoice.billTo.phone;
+      if (billtoEmailEl) billtoEmailEl.value = currentInvoice.billTo.email;
+    });
+  }
   
-  $('#from-profile').addEventListener('change', (e) => {
-    const id = e.target.value;
-    const p = profilesCache.find((x) => x.id === id);
-    if (!p) return;
-    
-    currentInvoice.from = { 
-      name: p.name || '', 
-      address: p.address || '', 
-      phone: p.phone || '', 
-      email: p.email || '' 
-    };
-    
-    $('#from-name').value = currentInvoice.from.name;
-    $('#from-address').value = currentInvoice.from.address;
-  });
+  const profileSelectEl = $('#from-profile');
+  if (profileSelectEl) {
+    profileSelectEl.addEventListener('change', (e) => {
+      const id = e.target.value;
+      const p = profilesCache.find((x) => x.id === id);
+      if (!p) return;
+      
+      currentInvoice.from = { 
+        name: p.name || '', 
+        address: p.address || '', 
+        phone: p.phone || '', 
+        email: p.email || '' 
+      };
+      
+      const fromNameEl = $('#from-name');
+      const fromAddressEl = $('#from-address');
+      
+      if (fromNameEl) fromNameEl.value = currentInvoice.from.name;
+      if (fromAddressEl) fromAddressEl.value = currentInvoice.from.address;
+    });
+  }
 
   // Navigation
-  const setActiveNav = (activeId) => {
-    $('.nav-item').forEach((item) => item.classList.remove('active'));
-    const activeItem = $(`#${activeId}`);
-    if (activeItem) activeItem.classList.add('active');
-  };
-
   onClick('nav-editor', () => {
     setActiveNav('nav-editor');
     showView('editor');
-    renderInvoiceForm();
+    if (currentInvoice) renderInvoiceForm();
   });
   
   onClick('nav-invoices', async () => {
     setActiveNav('nav-invoices');
     showView('list');
-    await renderInvoiceList($('#search').value);
+    const searchEl = $('#search');
+    await renderInvoiceList(searchEl ? searchEl.value : '');
   });
   
   onClick('nav-clients', () => {
@@ -465,21 +519,27 @@ const bindEvents = () => {
   onClick('act-pdf', () => exportPdf());
 
   // Search and filters
-  $('#search').addEventListener('input', async (e) => {
-    await renderInvoiceList(e.target.value);
-  });
+  const searchEl = $('#search');
+  if (searchEl) {
+    searchEl.addEventListener('input', async (e) => {
+      await renderInvoiceList(e.target.value);
+    });
+  }
   
   // Status filter buttons
-  $('[data-status]').forEach(btn => {
+  const filterBtns = document.querySelectorAll('[data-status]');
+  filterBtns.forEach(btn => {
     btn.addEventListener('click', async () => {
-      // Update active state
-      $('[data-status]').forEach(b => b.classList.remove('btn-primary'));
-      $('[data-status]').forEach(b => b.classList.add('btn-secondary'));
+      filterBtns.forEach(b => {
+        b.classList.remove('btn-primary');
+        b.classList.add('btn-secondary');
+      });
       btn.classList.remove('btn-secondary');
       btn.classList.add('btn-primary');
       
       currentListFilter = btn.getAttribute('data-status') || 'all';
-      await renderInvoiceList($('#search').value);
+      const searchEl = $('#search');
+      await renderInvoiceList(searchEl ? searchEl.value : '');
     });
   });
 
@@ -488,23 +548,23 @@ const bindEvents = () => {
     try {
       const newSettings = {
         ...appSettings,
-        taxRate: Number($('#settings-tax').value) || 0,
+        taxRate: Number($('#settings-tax')?.value) || 0,
         currency: '€',
         business: {
-          name: $('#settings-business-name').value || '',
-          address: $('#settings-business-address').value || '',
-          phone: $('#settings-business-phone').value || '',
-          email: $('#settings-business-email').value || ''
+          name: $('#settings-business-name')?.value || '',
+          address: $('#settings-business-address')?.value || '',
+          phone: $('#settings-business-phone')?.value || '',
+          email: $('#settings-business-email')?.value || ''
         },
-        theme: $('#settings-theme').value || 'light'
+        theme: $('#settings-theme')?.value || 'light'
       };
       
       appSettings = await api.settings.save(newSettings);
       applyTheme();
       
-      // Update current invoice defaults
+      // Update current invoice defaults if missing
       if (!currentInvoice.currency) currentInvoice.currency = appSettings.currency;
-      if (!currentInvoice.taxRate) currentInvoice.taxRate = appSettings.taxRate;
+      if (currentInvoice.taxRate == null) currentInvoice.taxRate = appSettings.taxRate;
       
       renderInvoiceForm();
       closeSettings();
@@ -527,18 +587,72 @@ const bindEvents = () => {
   });
 
   // Menu events from Electron
-  if (api.menu) {
+  if (api?.menu) {
     api.menu.onNew(() => newInvoice());
     api.menu.onOpen(async () => {
       setActiveNav('nav-invoices');
       showView('list');
-      await renderInvoiceList($('#search').value);
+      const searchEl = $('#search');
+      await renderInvoiceList(searchEl ? searchEl.value : '');
     });
     api.menu.onSave(() => saveInvoice());
     api.menu.onExport(() => exportPdf());
-    api.menu.onPrint(() => window.print());
+    api.menu.onPrint(() => printInvoice());
     api.menu.onSettings(() => openSettings());
     api.menu.onToggleTheme(() => toggleTheme());
+  }
+};
+
+// NOTE: made async so we can await dropdown fills when called
+const renderInvoiceForm = async () => {
+  if (!currentInvoice) {
+    console.error('No current invoice to render');
+    return;
+  }
+  
+  const inv = currentInvoice;
+  const invoiceNumberEl = $('#invoice-number');
+  const invoiceDateEl = $('#invoice-date');
+  const statusSel = $('#invoice-status');
+  
+  if (invoiceNumberEl) invoiceNumberEl.value = inv.invoiceNumber || '';
+  if (invoiceDateEl) invoiceDateEl.value = inv.date || '';
+  if (statusSel) statusSel.value = inv.status || 'open';
+  
+  const fromNameEl = $('#from-name');
+  const fromAddressEl = $('#from-address');
+  if (fromNameEl) fromNameEl.value = inv.from?.name || '';
+  if (fromAddressEl) fromAddressEl.value = inv.from?.address || '';
+  
+  const billtoNameEl = $('#billto-name');
+  const billtoAddressEl = $('#billto-address');
+  const billtoPhoneEl = $('#billto-phone');
+  const billtoEmailEl = $('#billto-email');
+  if (billtoNameEl) billtoNameEl.value = inv.billTo?.name || '';
+  if (billtoAddressEl) billtoAddressEl.value = inv.billTo?.address || '';
+  if (billtoPhoneEl) billtoPhoneEl.value = inv.billTo?.phone || '';
+  if (billtoEmailEl) billtoEmailEl.value = inv.billTo?.email || '';
+  
+  const notesEl = $('#notes');
+  const taxRateEl = $('#tax-rate');
+  if (notesEl) notesEl.value = inv.notes || '';
+  if (taxRateEl) taxRateEl.value = (inv.taxRate ?? appSettings?.taxRate) || 0;
+
+  const tbody = $('#items-body');
+  if (tbody && inv.items) {
+    tbody.innerHTML = '';
+    inv.items.forEach((it, idx) => tbody.appendChild(renderItemRow(it, idx)));
+  }
+
+  // Fill dropdowns (await to avoid flicker)
+  await renderClientDropdown();
+  await renderProfileDropdown();
+
+  updateTotals();
+
+  const pageTitle = $('.page-title');
+  if (pageTitle) {
+    pageTitle.textContent = inv.invoiceNumber ? `Račun ${inv.invoiceNumber}` : 'Novi račun';
   }
 };
 
@@ -548,8 +662,9 @@ const newInvoice = async () => {
     const next = await api.invoice.nextNumber();
     currentInvoice = blankInvoice();
     currentInvoice.invoiceNumber = next;
+    setActiveNav('nav-editor');
     showView('editor');
-    renderInvoiceForm();
+    await renderInvoiceForm();
     showNotification(`Kreiran novi račun ${next}`, 'success');
   } catch (error) {
     console.error('Error creating new invoice:', error);
@@ -558,15 +673,17 @@ const newInvoice = async () => {
 };
 
 const saveInvoice = async () => {
-  if (!currentInvoice.invoiceNumber) {
+  if (!currentInvoice?.invoiceNumber?.trim()) {
     showNotification('Broj računa je obavezan', 'warning');
-    $('#invoice-number').focus();
+    const invoiceNumberEl = $('#invoice-number');
+    if (invoiceNumberEl) invoiceNumberEl.focus();
     return;
   }
   
-  if (!currentInvoice.billTo.name) {
+  if (!currentInvoice?.billTo?.name?.trim()) {
     showNotification('Naziv klijenta je obavezan', 'warning');
-    $('#billto-name').focus();
+    const billtoNameEl = $('#billto-name');
+    if (billtoNameEl) billtoNameEl.focus();
     return;
   }
   
@@ -587,12 +704,29 @@ const exportPdf = async () => {
   }
   
   try {
-    renderPrintArea(currentInvoice);
-    window.print();
-    showNotification('PDF je spreman za ispis', 'success');
+    const result = await api.pdf.export(currentInvoice);
+    if (!result.canceled) {
+      showNotification('PDF je uspješno izvezen', 'success');
+    }
   } catch (error) {
     console.error('Error exporting PDF:', error);
     showNotification('Greška pri izvozu PDF-a', 'error');
+  }
+};
+
+const printInvoice = () => {
+  if (!currentInvoice) {
+    showNotification('Nema računa za ispis', 'warning');
+    return;
+  }
+  
+  try {
+    renderPrintArea(currentInvoice);
+    window.print();
+    showNotification('Račun je spreman za ispis', 'success');
+  } catch (error) {
+    console.error('Error printing invoice:', error);
+    showNotification('Greška pri ispisu računa', 'error');
   }
 };
 
@@ -667,41 +801,61 @@ const renderPrintArea = (inv) => {
 
 // ---------- Modal Management ----------
 const openSettings = () => {
-  $('#settings-modal').classList.add('open');
-  $('#settings-tax').value = appSettings?.taxRate ?? 0;
-  $('#settings-business-name').value = appSettings?.business?.name || '';
-  $('#settings-business-address').value = appSettings?.business?.address || '';
-  $('#settings-business-phone').value = appSettings?.business?.phone || '';
-  $('#settings-business-email').value = appSettings?.business?.email || '';
-  $('#settings-theme').value = appSettings?.theme || 'light';
+  const modal = $('#settings-modal');
+  if (modal) modal.classList.add('open');
+  
+  const taxEl = $('#settings-tax');
+  const nameEl = $('#settings-business-name');
+  const addressEl = $('#settings-business-address');
+  const phoneEl = $('#settings-business-phone');
+  const emailEl = $('#settings-business-email');
+  const themeEl = $('#settings-theme');
+  
+  if (taxEl) taxEl.value = appSettings?.taxRate ?? 0;
+  if (nameEl) nameEl.value = appSettings?.business?.name || '';
+  if (addressEl) addressEl.value = appSettings?.business?.address || '';
+  if (phoneEl) phoneEl.value = appSettings?.business?.phone || '';
+  if (emailEl) emailEl.value = appSettings?.business?.email || '';
+  if (themeEl) themeEl.value = appSettings?.theme || 'light';
 };
 
-const closeSettings = () => $('#settings-modal').classList.remove('open');
+const closeSettings = () => {
+  const modal = $('#settings-modal');
+  if (modal) modal.classList.remove('open');
+};
 
 // ---------- Clients Modal ----------
 const openClients = async () => {
-  $('#clients-modal').classList.add('open');
+  const modal = $('#clients-modal');
+  if (modal) modal.classList.add('open');
   await renderClients();
   bindClientEvents();
 };
 
 const closeClients = () => {
-  $('#clients-modal').classList.remove('open');
+  const modal = $('#clients-modal');
+  if (modal) modal.classList.remove('open');
   hideClientForm();
 };
 
 const bindClientEvents = () => {
-  $('#client-search').oninput = async (e) => renderClients(e.target.value);
-  $('#client-new').onclick = () => showClientForm();
-  $('#client-save').onclick = () => saveClientForm();
-  $('#client-cancel').onclick = () => hideClientForm();
-  $('#clients-close').onclick = () => closeClients();
+  const searchEl = $('#client-search');
+  if (searchEl) {
+    searchEl.addEventListener('input', async (e) => renderClients(e.target.value));
+  }
+  
+  onClick('client-new', () => showClientForm());
+  onClick('client-save', () => saveClientForm());
+  onClick('client-cancel', () => hideClientForm());
+  onClick('clients-close', () => closeClients());
 };
 
 const renderClients = async (query = '') => {
   try {
     clientsCache = await api.clients.list(query);
     const tbody = $('#clients-body');
+    if (!tbody) return;
+    
     tbody.innerHTML = '';
     
     if (clientsCache.length === 0) {
@@ -734,19 +888,27 @@ const renderClients = async (query = '') => {
         </td>
       `;
       
-      tr.querySelector('[data-edit]').onclick = () => showClientForm(c);
-      tr.querySelector('[data-del]').onclick = async () => {
-        if (!confirm(`Obrisati klijenta "${c.name}"?`)) return;
-        try {
-          await api.clients.delete(c.id);
-          await renderClients($('#client-search').value);
-          await renderClientDropdown();
-          showNotification('Klijent je obrisan', 'success');
-        } catch (error) {
-          console.error('Error deleting client:', error);
-          showNotification('Greška pri brisanju klijenta', 'error');
-        }
-      };
+      const editBtn = tr.querySelector('[data-edit]');
+      if (editBtn) {
+        editBtn.addEventListener('click', () => showClientForm(c));
+      }
+      
+      const delBtn = tr.querySelector('[data-del]');
+      if (delBtn) {
+        delBtn.addEventListener('click', async () => {
+          if (!confirm(`Obrisati klijenta "${c.name}"?`)) return;
+          try {
+            await api.clients.delete(c.id);
+            const searchEl = $('#client-search');
+            await renderClients(searchEl ? searchEl.value : '');
+            await renderClientDropdown();
+            showNotification('Klijent je obrisan', 'success');
+          } catch (error) {
+            console.error('Error deleting client:', error);
+            showNotification('Greška pri brisanju klijenta', 'error');
+          }
+        });
+      }
       
       tbody.appendChild(tr);
     });
@@ -760,38 +922,52 @@ let editingClientId = null;
 
 const showClientForm = (client = { id: null, name: '', phone: '', email: '', address: '' }) => {
   editingClientId = client.id;
-  $('#client-name').value = client.name || '';
-  $('#client-phone').value = client.phone || '';
-  $('#client-email').value = client.email || '';
-  $('#client-address').value = client.address || '';
-  $('#client-form').style.display = 'block';
-  $('#client-name').focus();
+  
+  const nameEl = $('#client-name');
+  const phoneEl = $('#client-phone');
+  const emailEl = $('#client-email');
+  const addressEl = $('#client-address');
+  const formEl = $('#client-form');
+  
+  if (nameEl) nameEl.value = client.name || '';
+  if (phoneEl) phoneEl.value = client.phone || '';
+  if (emailEl) emailEl.value = client.email || '';
+  if (addressEl) addressEl.value = client.address || '';
+  if (formEl) formEl.style.display = 'block';
+  if (nameEl) nameEl.focus();
 };
 
 const hideClientForm = () => {
   editingClientId = null;
-  $('#client-form').style.display = 'none';
+  const formEl = $('#client-form');
+  if (formEl) formEl.style.display = 'none';
 };
 
 const saveClientForm = async () => {
+  const nameEl = $('#client-name');
+  const phoneEl = $('#client-phone');
+  const emailEl = $('#client-email');
+  const addressEl = $('#client-address');
+  
   const payload = {
     id: editingClientId || undefined,
-    name: $('#client-name').value.trim(),
-    phone: $('#client-phone').value.trim(),
-    email: $('#client-email').value.trim(),
-    address: $('#client-address').value.trim()
+    name: nameEl ? nameEl.value.trim() : '',
+    phone: phoneEl ? phoneEl.value.trim() : '',
+    email: emailEl ? emailEl.value.trim() : '',
+    address: addressEl ? addressEl.value.trim() : ''
   };
   
   if (!payload.name) {
     showNotification('Naziv klijenta je obavezan', 'warning');
-    $('#client-name').focus();
+    if (nameEl) nameEl.focus();
     return;
   }
   
   try {
     await api.clients.save(payload);
     hideClientForm();
-    await renderClients($('#client-search').value);
+    const searchEl = $('#client-search');
+    await renderClients(searchEl ? searchEl.value : '');
     await renderClientDropdown();
     showNotification(editingClientId ? 'Klijent je ažuriran' : 'Novi klijent je dodan', 'success');
   } catch (error) {
@@ -804,6 +980,8 @@ const renderClientDropdown = async () => {
   try {
     clientsCache = await api.clients.list('');
     const sel = $('#client-select');
+    if (!sel) return;
+    
     const currentId = sel.value;
     
     sel.innerHTML = '<option value="">Odaberite klijenta...</option>' + 
@@ -817,28 +995,36 @@ const renderClientDropdown = async () => {
 
 // ---------- Profiles Modal ----------
 const openProfiles = async () => {
-  $('#profiles-modal').classList.add('open');
+  const modal = $('#profiles-modal');
+  if (modal) modal.classList.add('open');
   await renderProfiles();
   bindProfileEvents();
 };
 
 const closeProfiles = () => {
-  $('#profiles-modal').classList.remove('open');
+  const modal = $('#profiles-modal');
+  if (modal) modal.classList.remove('open');
   hideProfileForm();
 };
 
 const bindProfileEvents = () => {
-  $('#profile-search').oninput = async (e) => renderProfiles(e.target.value);
-  $('#profile-new').onclick = () => showProfileForm();
-  $('#profile-save').onclick = () => saveProfileForm();
-  $('#profile-cancel').onclick = () => hideProfileForm();
-  $('#profiles-close').onclick = () => closeProfiles();
+  const searchEl = $('#profile-search');
+  if (searchEl) {
+    searchEl.addEventListener('input', async (e) => renderProfiles(e.target.value));
+  }
+  
+  onClick('profile-new', () => showProfileForm());
+  onClick('profile-save', () => saveProfileForm());
+  onClick('profile-cancel', () => hideProfileForm());
+  onClick('profiles-close', () => closeProfiles());
 };
 
 const renderProfiles = async (query = '') => {
   try {
     profilesCache = await api.profiles.list(query);
     const tbody = $('#profiles-body');
+    if (!tbody) return;
+    
     tbody.innerHTML = '';
     
     if (profilesCache.length === 0) {
@@ -871,19 +1057,27 @@ const renderProfiles = async (query = '') => {
         </td>
       `;
       
-      tr.querySelector('[data-edit]').onclick = () => showProfileForm(p);
-      tr.querySelector('[data-del]').onclick = async () => {
-        if (!confirm(`Obrisati profil "${p.name}"?`)) return;
-        try {
-          await api.profiles.delete(p.id);
-          await renderProfiles($('#profile-search').value);
-          await renderProfileDropdown();
-          showNotification('Profil je obrisan', 'success');
-        } catch (error) {
-          console.error('Error deleting profile:', error);
-          showNotification('Greška pri brisanju profila', 'error');
-        }
-      };
+      const editBtn = tr.querySelector('[data-edit]');
+      if (editBtn) {
+        editBtn.addEventListener('click', () => showProfileForm(p));
+      }
+      
+      const delBtn = tr.querySelector('[data-del]');
+      if (delBtn) {
+        delBtn.addEventListener('click', async () => {
+          if (!confirm(`Obrisati profil "${p.name}"?`)) return;
+          try {
+            await api.profiles.delete(p.id);
+            const searchEl = $('#profile-search');
+            await renderProfiles(searchEl ? searchEl.value : '');
+            await renderProfileDropdown();
+            showNotification('Profil je obrisan', 'success');
+          } catch (error) {
+            console.error('Error deleting profile:', error);
+            showNotification('Greška pri brisanju profila', 'error');
+          }
+        });
+      }
       
       tbody.appendChild(tr);
     });
@@ -897,38 +1091,52 @@ let editingProfileId = null;
 
 const showProfileForm = (profile = { id: null, name: '', phone: '', email: '', address: '' }) => {
   editingProfileId = profile.id;
-  $('#profile-name').value = profile.name || '';
-  $('#profile-phone').value = profile.phone || '';
-  $('#profile-email').value = profile.email || '';
-  $('#profile-address').value = profile.address || '';
-  $('#profile-form').style.display = 'block';
-  $('#profile-name').focus();
+  
+  const nameEl = $('#profile-name');
+  const phoneEl = $('#profile-phone');
+  const emailEl = $('#profile-email');
+  const addressEl = $('#profile-address');
+  const formEl = $('#profile-form');
+  
+  if (nameEl) nameEl.value = profile.name || '';
+  if (phoneEl) phoneEl.value = profile.phone || '';
+  if (emailEl) emailEl.value = profile.email || '';
+  if (addressEl) addressEl.value = profile.address || '';
+  if (formEl) formEl.style.display = 'block';
+  if (nameEl) nameEl.focus();
 };
 
 const hideProfileForm = () => {
   editingProfileId = null;
-  $('#profile-form').style.display = 'none';
+  const formEl = $('#profile-form');
+  if (formEl) formEl.style.display = 'none';
 };
 
 const saveProfileForm = async () => {
+  const nameEl = $('#profile-name');
+  const phoneEl = $('#profile-phone');
+  const emailEl = $('#profile-email');
+  const addressEl = $('#profile-address');
+  
   const payload = {
     id: editingProfileId || undefined,
-    name: $('#profile-name').value.trim(),
-    phone: $('#profile-phone').value.trim(),
-    email: $('#profile-email').value.trim(),
-    address: $('#profile-address').value.trim()
+    name: nameEl ? nameEl.value.trim() : '',
+    phone: phoneEl ? phoneEl.value.trim() : '',
+    email: emailEl ? emailEl.value.trim() : '',
+    address: addressEl ? addressEl.value.trim() : ''
   };
   
   if (!payload.name) {
     showNotification('Naziv profila je obavezan', 'warning');
-    $('#profile-name').focus();
+    if (nameEl) nameEl.focus();
     return;
   }
   
   try {
     await api.profiles.save(payload);
     hideProfileForm();
-    await renderProfiles($('#profile-search').value);
+    const searchEl = $('#profile-search');
+    await renderProfiles(searchEl ? searchEl.value : '');
     await renderProfileDropdown();
     showNotification(editingProfileId ? 'Profil je ažuriran' : 'Novi profil je dodan', 'success');
   } catch (error) {
@@ -941,6 +1149,8 @@ const renderProfileDropdown = async () => {
   try {
     profilesCache = await api.profiles.list('');
     const sel = $('#from-profile');
+    if (!sel) return;
+    
     const currentId = sel.value;
     
     sel.innerHTML = '<option value="">Odaberite profil...</option>' + 
@@ -954,9 +1164,15 @@ const renderProfileDropdown = async () => {
 
 // ---------- View Management ----------
 const showView = (viewName) => {
-  $('.view').forEach((view) => view.classList.remove('active'));
+  // FIX: use $$ to get a NodeList array; $('.view') returns a single element
+  const views = $$('.view');
+  views.forEach((view) => view.classList.remove('active'));
   const targetView = $(`#view-${viewName}`);
-  if (targetView) targetView.classList.add('active');
+  if (targetView) {
+    targetView.classList.add('active');
+  } else {
+    console.warn(`View #view-${viewName} not found in DOM`);
+  }
 };
 
 // ---------- Theme ----------
@@ -981,6 +1197,14 @@ const toggleTheme = async () => {
 // ---------- Bootstrap ----------
 window.addEventListener('DOMContentLoaded', async () => {
   try {
+    // Wait a bit for DOM to be fully ready
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Check if API is available
+    if (!window.api) {
+      throw new Error('API not available - preload script may have failed');
+    }
+    
     // Load settings
     appSettings = await api.settings.get();
     applyTheme();
@@ -988,11 +1212,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Initialize with blank invoice
     currentInvoice = blankInvoice();
     
-    // Render initial form
-    renderInvoiceForm();
-    
-    // Bind all events
+    // Bind all events FIRST
     bindEvents();
+    
+    // Then render initial form
+    await renderInvoiceForm();
     
     // Load initial data
     await renderInvoiceList();
@@ -1000,15 +1224,19 @@ window.addEventListener('DOMContentLoaded', async () => {
     await renderProfileDropdown();
     
     // Set initial active filter
-    const allFilterBtn = $('[data-status="all"]');
+    const allFilterBtn = document.querySelector('[data-status="all"]');
     if (allFilterBtn) {
       allFilterBtn.classList.remove('btn-secondary');
       allFilterBtn.classList.add('btn-primary');
     }
     
-    console.log('InvoiceApp initialized successfully');
+    // Ensure editor view is active by default
+    showView('editor');
+    setActiveNav('nav-editor');
+    
+    showNotification('Aplikacija je uspješno pokrenuta', 'success');
   } catch (error) {
     console.error('Error initializing app:', error);
-    showNotification('Greška pri pokretanju aplikacije', 'error');
+    showNotification('Greška pri pokretanju aplikacije: ' + error.message, 'error');
   }
 });

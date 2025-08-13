@@ -113,18 +113,39 @@ class InvoiceStore {
       try {
         const raw = fs.readFileSync(path.join(this.invoicesDir, file), 'utf-8');
         const data = JSON.parse(raw);
-        return { id, invoiceNumber: data.invoiceNumber, date: data.date, billTo: data.billTo, total: data.total, currency: data.currency, status: data.status || 'open' };
+        return { 
+          id, 
+          invoiceNumber: data.invoiceNumber, 
+          date: data.date, 
+          billTo: data.billTo, 
+          total: data.total, 
+          currency: data.currency, 
+          status: data.status || 'open' 
+        };
       } catch {
-        return { id, invoiceNumber: id, date: '', billTo: { name: '' }, total: 0, currency: '$', status: 'open' };
+        return { 
+          id, 
+          invoiceNumber: id, 
+          date: '', 
+          billTo: { name: '' }, 
+          total: 0, 
+          currency: '$', 
+          status: 'open' 
+        };
       }
     });
-    if (!query) return items.sort((a, b) => (a.date < b.date ? 1 : -1));
+    
+    const sorted = items.sort((a, b) => (a.date < b.date ? 1 : -1));
+    if (!query || typeof query !== 'string') {
+      return sorted;
+    }
+    
     const lower = query.toLowerCase();
-    return items
-      .filter((it) =>
-        [it.invoiceNumber, it.date, it.billTo?.name].filter(Boolean).some((v) => String(v).toLowerCase().includes(lower))
-      )
-      .sort((a, b) => (a.date < b.date ? 1 : -1));
+    return sorted.filter((it) =>
+      [it.invoiceNumber, it.date, it.billTo?.name]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(lower))
+    );
   }
   load(id) {
     const file = path.join(this.invoicesDir, `${id}.json`);
@@ -230,9 +251,13 @@ class ClientsStore extends JsonArrayStore {
   }
   list(query = '') {
     const all = this.readAll();
-    if (!query) return all;
+    if (!query || typeof query !== 'string') return all;
     const q = query.toLowerCase();
-    return all.filter((c) => [c.name, c.email, c.phone, c.address].filter(Boolean).some((v) => String(v).toLowerCase().includes(q)));
+    return all.filter((c) => 
+      [c.name, c.email, c.phone, c.address].filter(Boolean).some((v) => 
+        String(v).toLowerCase().includes(q)
+      )
+    );
   }
   save(client) {
     const id = this.slugify(client.id || client.name || `client-${Date.now()}`);
@@ -252,9 +277,13 @@ class ProfilesStore extends JsonArrayStore {
   }
   list(query = '') {
     const all = this.readAll();
-    if (!query) return all;
+    if (!query || typeof query !== 'string') return all;
     const q = query.toLowerCase();
-    return all.filter((p) => [p.name, p.email, p.phone, p.address].filter(Boolean).some((v) => String(v).toLowerCase().includes(q)));
+    return all.filter((p) => 
+      [p.name, p.email, p.phone, p.address].filter(Boolean).some((v) => 
+        String(v).toLowerCase().includes(q)
+      )
+    );
   }
   save(profile) {
     const id = this.slugify(profile.id || profile.name || `profile-${Date.now()}`);
@@ -268,99 +297,181 @@ class ProfilesStore extends JsonArrayStore {
   }
 }
 
-// ----- PDF Generation -----
+// ----- PDF Generation with proper Croatian character support -----
 import { jsPDF } from 'jspdf';
-// Register jspdf-autotable plugin on jsPDF instance
 import 'jspdf-autotable';
 
 class PdfService {
   static async exportInvoice(invoice, outputPath) {
-    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-    const margin = 40;
-    const lineHeight = 18;
-    const bold = (txt, size = 12) => {
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(size);
-      doc.text(txt, margin, doc.getLineHeight());
-    };
-    let y = margin;
-
-    // Header
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(24);
-    doc.text('INVOICE', margin, y);
+    const doc = new jsPDF({ 
+      unit: 'pt', 
+      format: 'a4',
+      putOnlyUsedFonts: true,
+      compress: true
+    });
+    
     doc.setFont('helvetica', 'normal');
+    
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 50;
+    let y = margin + 20;
+    
+    doc.setFillColor(59, 130, 246);
+    doc.rect(margin, y - 20, pageWidth - 2 * margin, 60, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(28);
+    doc.text('RAČUN', margin + 20, y + 10);
+    
     doc.setFontSize(12);
-    doc.text(`Invoice #: ${invoice.invoiceNumber}`, 400, y);
-    y += lineHeight;
-    doc.text(`Date: ${invoice.date}`, 400, y);
-    y += lineHeight * 1.5;
-
-    // From / Bill To
-    doc.setFont('helvetica', 'bold');
-    doc.text('From', margin, y);
-    doc.text('Bill To', 300, y);
-    y += lineHeight;
     doc.setFont('helvetica', 'normal');
-    const fromLines = (invoice.from?.name || '') + (invoice.from?.address ? `\n${invoice.from.address}` : '');
-    const toLines = (invoice.billTo?.name || '') + (invoice.billTo?.address ? `\n${invoice.billTo.address}` : '');
-    doc.text(fromLines, margin, y, { maxWidth: 240 });
-    doc.text(toLines, 300, y, { maxWidth: 240 });
-    y += lineHeight * 3;
-
-    // Items table
+    const rightX = pageWidth - margin - 150;
+    doc.text(`Broj računa: ${invoice.invoiceNumber || ''}`, rightX, y - 5);
+    doc.text(`Datum: ${invoice.date || ''}`, rightX, y + 15);
+    doc.text(`Status: ${invoice.status === 'paid' ? 'Plaćen' : invoice.status === 'overdue' ? 'Dospio' : 'Neplaćen'}`, rightX, y + 35);
+    
+    y += 80;
+    
+    doc.setTextColor(0, 0, 0);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('Pošaljitelj', margin, y);
+    doc.text('Primatelj', pageWidth / 2 + 20, y);
+    
+    y += 25;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    
+    const fromText = [
+      invoice.from?.name || '',
+      invoice.from?.address || '',
+      invoice.from?.phone ? `Tel: ${invoice.from.phone}` : '',
+      invoice.from?.email ? `Email: ${invoice.from.email}` : ''
+    ].filter(Boolean);
+    
+    fromText.forEach((line, index) => {
+      doc.text(line, margin, y + (index * 16));
+    });
+    
+    const toText = [
+      invoice.billTo?.name || '',
+      invoice.billTo?.address || '',
+      invoice.billTo?.phone ? `Tel: ${invoice.billTo.phone}` : '',
+      invoice.billTo?.email ? `Email: ${invoice.billTo.email}` : ''
+    ].filter(Boolean);
+    
+    toText.forEach((line, index) => {
+      doc.text(line, pageWidth / 2 + 20, y + (index * 16));
+    });
+    
+    y += Math.max(fromText.length, toText.length) * 16 + 40;
+    
     const currency = '€';
+    const tableData = (invoice.items || []).map((item) => [
+      item.description || '',
+      String(item.quantity || 0),
+      `${currency}${Number(item.unitPrice || 0).toFixed(2)}`,
+      `${currency}${(Number(item.quantity || 0) * Number(item.unitPrice || 0)).toFixed(2)}`
+    ]);
+    
     doc.autoTable({
       startY: y,
-      headStyles: { fillColor: [33, 150, 243] },
-      head: [['Description', 'Qty', 'Unit Price', 'Total']],
-      body: invoice.items.map((it) => [
-        it.description,
-        String(it.quantity),
-        `${currency}${Number(it.unitPrice).toFixed(2)}`,
-        `${currency}${(Number(it.quantity) * Number(it.unitPrice)).toFixed(2)}`
-      ]),
-      styles: { font: 'helvetica', fontSize: 11 },
+      head: [['Opis', 'Količina', 'Jedinična cijena', 'Ukupno']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { 
+        fillColor: [59, 130, 246],
+        textColor: [255, 255, 255],
+        fontSize: 12,
+        fontStyle: 'bold',
+        halign: 'center'
+      },
+      bodyStyles: { 
+        fontSize: 11,
+        cellPadding: 8
+      },
       columnStyles: {
-        1: { halign: 'right' },
-        2: { halign: 'right' },
-        3: { halign: 'right' }
-      }
+        0: { cellWidth: 'auto', halign: 'left', minCellWidth: 150 },
+        1: { cellWidth: 60, halign: 'center' },
+        2: { cellWidth: 80, halign: 'right' },
+        3: { cellWidth: 80, halign: 'right' }
+      },
+      styles: {
+        font: 'helvetica',
+        lineColor: [200, 200, 200],
+        lineWidth: 0.5,
+        overflow: 'linebreak',
+        cellWidth: 'wrap'
+      },
+      margin: { left: margin, right: margin },
+      tableWidth: 'auto',
+      showHead: 'everyPage'
     });
-    const tableY = (doc.lastAutoTable && doc.lastAutoTable.finalY) || y;
-
-    // Totals
-    const subTotal = invoice.subTotal ?? invoice.items.reduce((s, it) => s + it.quantity * it.unitPrice, 0);
+    
+    const tableEndY = doc.lastAutoTable.finalY + 30;
+    
+    const subTotal = invoice.subTotal ?? (invoice.items || []).reduce((s, it) => s + (Number(it.quantity) * Number(it.unitPrice)), 0);
     const taxAmount = invoice.taxAmount ?? (subTotal * (Number(invoice.taxRate) || 0)) / 100;
     const total = invoice.total ?? subTotal + taxAmount;
-
-    const totalsX = 340;
-    const totalsY = tableY + 20;
+    
+    const totalsX = pageWidth - margin - 200;
+    
     doc.autoTable({
-      startY: totalsY,
-      theme: 'grid',
-      styles: { font: 'helvetica', fontSize: 11 },
+      startY: tableEndY,
       body: [
-        ['Subtotal', `${currency}${subTotal.toFixed(2)}`],
-        [`Tax (${invoice.taxRate || 0}%)`, `${currency}${taxAmount.toFixed(2)}`],
-        [{ content: 'Total', styles: { fontStyle: 'bold' } }, { content: `${currency}${total.toFixed(2)}`, styles: { fontStyle: 'bold' } }]
+        ['Međuzbroj:', `${currency}${subTotal.toFixed(2)}`],
+        [`Porez (${invoice.taxRate || 0}%):`, `${currency}${taxAmount.toFixed(2)}`],
+        ['UKUPNO:', `${currency}${total.toFixed(2)}`]
       ],
-      columnStyles: { 0: { cellWidth: 160 }, 1: { halign: 'right', cellWidth: 120 } },
-      tableLineWidth: 0.5,
-      tableLineColor: [200, 200, 200],
-      margin: { left: totalsX }
+      theme: 'plain',
+      styles: {
+        font: 'helvetica',
+        fontSize: 12,
+        cellPadding: 5,
+        overflow: 'linebreak'
+      },
+      bodyStyles: {
+        textColor: [0, 0, 0]
+      },
+      columnStyles: {
+        0: { cellWidth: 100, halign: 'left', fontStyle: 'normal' },
+        1: { cellWidth: 70, halign: 'right', fontStyle: 'normal' }
+      },
+      didParseCell: function (data) {
+        if (data.row.index === 2) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fontSize = 14;
+          data.cell.styles.fillColor = [240, 240, 240];
+        }
+      },
+      margin: { left: totalsX },
+      tableWidth: 170
     });
-
-    // Notes
-    const notesStartY = ((doc.lastAutoTable && doc.lastAutoTable.finalY) || totalsY) + 24;
-    if (invoice.notes) {
-      doc.setFont('helvetica', 'bold');
-      doc.text('Notes / Terms', margin, notesStartY);
-      doc.setFont('helvetica', 'normal');
-      doc.text(String(invoice.notes), margin, notesStartY + 16, { maxWidth: 520 });
+    
+    if (invoice.notes && String(invoice.notes).trim()) {
+      const notesY = doc.lastAutoTable.finalY + 40;
+      if (notesY < pageHeight - 100) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text('Napomene / Uvjeti:', margin, notesY);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        const noteLines = doc.splitTextToSize(String(invoice.notes), pageWidth - 2 * margin);
+        doc.text(noteLines, margin, notesY + 20);
+      }
     }
-
-    // Save
+    
+    const footerY = pageHeight - 30;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(128, 128, 128);
+    doc.text(`Generiran ${new Date().toLocaleDateString('hr-HR')}`, margin, footerY);
+    doc.text(`Stranica 1 od 1`, pageWidth - margin - 60, footerY);
+    
     const pdfBytes = doc.output('arraybuffer');
     fs.writeFileSync(outputPath, Buffer.from(pdfBytes));
   }
@@ -385,7 +496,6 @@ const createWindow = () => {
 
   mainWindow.loadFile(path.join(app.getAppPath(), 'src', 'index.html'));
   // mainWindow.webContents.openDevTools();
-  // Lock 16:9 aspect ratio across resizes
   try { mainWindow.setAspectRatio(16 / 9); } catch {}
 };
 
@@ -442,12 +552,7 @@ const buildMenu = (settingsStore) => {
     {
       role: 'help',
       submenu: [
-        {
-          label: 'Learn More',
-          click: async () => {
-            await shell.openExternal('https://www.electronjs.org');
-          }
-        }
+        { label: 'Learn More', click: async () => { await shell.openExternal('https://www.electronjs.org'); } }
       ]
     }
   ];
@@ -464,7 +569,6 @@ const profilesStore = new ProfilesStore(getProfilesPath());
 app.whenReady().then(() => {
   createWindow();
   buildMenu(settingsStore);
-
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -508,5 +612,3 @@ ipcMain.handle('clients:delete', async (_e, id) => clientsStore.delete(id));
 ipcMain.handle('profiles:list', async (_e, query = '') => profilesStore.list(query));
 ipcMain.handle('profiles:save', async (_e, profile) => profilesStore.save(profile));
 ipcMain.handle('profiles:delete', async (_e, id) => profilesStore.delete(id));
-
-
